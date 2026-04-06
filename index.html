@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Ball Multiplier - Unlimited</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <style>
+        body { margin: 0; background: #0a0a0f; color: white; overflow: hidden; font-family: monospace; }
+        canvas { display: block; margin: auto; background: #000; }
+        #ui { position: absolute; top: 20px; left: 50%; transform: translateX(-50%); 
+              background: rgba(30, 30, 40, 0.8); padding: 10px 20px; border-radius: 10px;
+              border: 1px solid #00ff64; color: #00ff64; font-weight: bold; pointer-events: none; }
+    </style>
+</head>
+<body>
+    <div id="ui">BALLS: 1 | FPS: 60</div>
+    <canvas id="gameCanvas"></canvas>
+
+<script>
+const canvas = document.getElementById('gameCanvas');
+const ctx = canvas.getContext('2d');
+const ui = document.getElementById('ui');
+
+// ตั้งค่าหน้าจอ
+canvas.width = window.innerWidth > 600 ? 600 : window.innerWidth;
+canvas.height = window.innerHeight;
+
+const centerX = canvas.width / 2;
+const centerY = canvas.height / 2;
+const circleRadius = canvas.width * 0.45;
+const ballRadius = 6;
+const gravity = 0.2;
+const friction = 1.0;
+
+let particles = [{ x: centerX, y: centerY - 50, vx: 5, vy: 0 }];
+let lastTime = 0;
+
+// สร้างเสียง Beep แบบไม่ต้องมีไฟล์
+const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+function playBeep() {
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    osc.connect(gain);
+    gain.connect(audioCtx.destination);
+    osc.frequency.value = 600;
+    gain.gain.setValueAtTime(0.1, audioCtx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + 0.05);
+    osc.start();
+    osc.stop(audioCtx.currentTime + 0.05);
+}
+
+function update(time) {
+    const dt = time - lastTime;
+    lastTime = time;
+    
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    
+    // วาดวงกลมขอบขาว
+    ctx.strokeStyle = "white";
+    ctx.lineWidth = 4;
+    ctx.beginPath();
+    ctx.arc(centerX, centerY, circleRadius, 0, Math.PI * 2);
+    ctx.stroke();
+
+    let newParticles = [];
+    particles.forEach(p => {
+        p.vy += gravity;
+        p.x += p.vx;
+        p.y += p.vy;
+
+        const dx = p.x - centerX;
+        const dy = p.y - centerY;
+        const dist = Math.sqrt(dx*dx + dy*dy);
+
+        if (dist + ballRadius > circleRadius) {
+            playBeep();
+            
+            // ดันกลับ
+            const nx = dx / dist;
+            const ny = dy / dist;
+            const overlap = (dist + ballRadius) - circleRadius;
+            p.x -= nx * overlap;
+            p.y -= ny * overlap;
+
+            // สะท้อน
+            const dot = p.vx * nx + p.vy * ny;
+            p.vx = (p.vx - 2 * dot * nx) * friction;
+            p.vy = (p.vy - 2 * dot * ny) * friction;
+
+            // คูณ 2 (เพิ่มลูกใหม่)
+            newParticles.push({
+                x: p.x, y: p.y,
+                vx: p.vx + (Math.random() - 0.5) * 2,
+                vy: p.vy + (Math.random() - 0.5) * 2
+            });
+        }
+
+        // วาดลูกบอล
+        ctx.fillStyle = "#ff3250";
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, ballRadius, 0, Math.PI * 2);
+        ctx.fill();
+    });
+
+    particles = particles.concat(newParticles);
+    
+    // อัปเดต UI
+    ui.innerText = `BALLS: ${particles.length} | FPS: ${Math.round(1000/dt) || 0}`;
+
+    requestAnimationFrame(update);
+}
+
+// เริ่มเกมเมื่อกดหน้าจอ (เพื่อให้ Browser ยอมให้เล่นเสียง)
+window.onclick = () => {
+    if (audioCtx.state === 'suspended') audioCtx.resume();
+};
+
+requestAnimationFrame(update);
+</script>
+</body>
+</html>
